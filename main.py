@@ -1,53 +1,35 @@
-import os
-from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from supabase import create_client, Client
+import os
 
-# Cargar variables de entorno
-load_dotenv()
-
-# Configurar el cliente de Supabase
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+# Configuración de Supabase
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 supabase: Client = create_client(url, key)
 
-def insert_product(name: str, description: str, price: float, stock: int):
-    """Inserta un producto en la base de datos."""
-    data, error = supabase.table("products").insert({
-        "name": name,
-        "description": description,
-        "price": price,
-        "stock": stock
-    }).execute()
-    
-    if error:
-        print(f"Error al insertar producto: {error}")
-    else:
-        print(f"Producto '{name}' insertado correctamente.")
+app = FastAPI()
 
-def list_products():
-    """Lista todos los productos en la base de datos."""
-    response = supabase.table("products").select("*").execute()
-    
-    if response.data:
-        print("\nLista de productos:")
-        for product in response.data:
-            print(f"ID: {product['id']}")
-            print(f"Nombre: {product['name']}")
-            print(f"Descripción: {product['description']}")
-            print(f"Precio: ${product['price']:.2f}")
-            print(f"Stock: {product['stock']}")
-            print("-" * 30)
-    else:
-        print("No se encontraron productos.")
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
 
-def main():
-    # Insertar productos de prueba
-    insert_product("Laptop", "Laptop de alta gama", 999.99, 50)
-    insert_product("Smartphone", "Último modelo de smartphone", 699.99, 100)
-    insert_product("Auriculares Bluetooth", "Auriculares inalámbricos de calidad", 129.99, 200)
+# Modelo para crear productos
+class Producto(BaseModel):
+    nombre: str
+    cantidad_disponible: int
+    id_almacen: int
 
-    # Listar todos los productos
-    list_products()
+@app.post("/productos")
+async def create_producto(producto: Producto):
+    response = supabase.table("productos").insert(producto.model_dump()).execute()
+    if response.error:
+        raise HTTPException(status_code=400, detail="Error creando el producto.")
+    return response.data
 
-if __name__ == "__main__":
-    main()
+@app.get("/productos")
+async def get_productos():
+    response = supabase.table("productos").select("*").execute()
+    return response.data
+
+# Aquí puedes agregar más endpoints para manejar almacenes, pedidos, tracking, etc.
